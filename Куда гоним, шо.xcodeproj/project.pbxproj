@@ -14,7 +14,7 @@
 		142D31562FB4C5F100F49F3B /* Exceptions for "Куда гоним, шо" folder in "Куда гоним, шо" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Info.plist,
+				app/Info.plist,
 			);
 			target = 142D31432FB4C5EF00F49F3B /* Куда гоним, шо */;
 		};
