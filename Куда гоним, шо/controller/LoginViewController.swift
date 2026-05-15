@@ -8,7 +8,8 @@
 import UIKit
 
 class LoginViewController: UIViewController {
-
+    
+    //MARK: - Аутлеты
     @IBOutlet weak var appNameLabel: UILabel!
     @IBOutlet weak var loginLabel: UILabel!
     
@@ -22,6 +23,7 @@ class LoginViewController: UIViewController {
     
     private let contentStack = UIStackView()
     
+    //MARK: - ViewDidLoad
     override func viewDidLoad() {
         super.viewDidLoad()
         
@@ -29,6 +31,7 @@ class LoginViewController: UIViewController {
         setupLoginLayout()
     }
     
+    //MARK: - Настройка UI и Layout
     private func setupLoginUI() {
         
         loginButton.layer.cornerRadius = 1
@@ -44,6 +47,7 @@ class LoginViewController: UIViewController {
         passwordTextField.layer.borderWidth = 1
         passwordTextField.layer.borderColor = UIColor.systemGray4.cgColor
         passwordTextField.clipsToBounds = true
+        passwordTextField.isSecureTextEntry = true
         
     }
     
@@ -55,7 +59,7 @@ class LoginViewController: UIViewController {
         loginButton.translatesAutoresizingMaskIntoConstraints = false
         orLabel.translatesAutoresizingMaskIntoConstraints = false
         registerButton.translatesAutoresizingMaskIntoConstraints = false
-
+        
         
         contentStack.axis = .vertical
         contentStack.alignment = .fill
@@ -87,21 +91,55 @@ class LoginViewController: UIViewController {
             registerButton.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -100),
             registerButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -365),
             
-            emailTextField.heightAnchor.constraint(equalToConstant: 30),
-            passwordTextField.heightAnchor.constraint(equalToConstant: 30)
+            emailTextField.heightAnchor.constraint(equalToConstant: 35),
+            passwordTextField.heightAnchor.constraint(equalToConstant: 35)
         ])
         
         contentStack.setCustomSpacing(20, after: loginLabel)
     }
     
     
+    //MARK: - Кнопки логина и регистрации
+    @IBAction func loginButtonTapped(_ sender: UIButton) {
     
-    @IBAction func loginButtonTapped(_ sender: Any) {
+        guard
+            let email = emailTextField.text,
+            let password = passwordTextField.text
+        else {
+            return
+        }
+        
+        //Проверка на пустые поля
+        if email.isEmpty || password.isEmpty {
+            showAlert(title: "Ошибка",
+                      message: "Заполните все поля")
+        }
+        
+        guard let savedUser = UserStorage.shared.getUser() else {
+            showAlert(title: "Ошибка",
+                      message: "Пользователь не найден")
+            return
+        }
+        
+        let savedPassword = KeychainService.shared.getPassword(for: email)
+        
+        //Проверка соответствия данных ввода и пуш в HomeViewController
+        if savedUser.email == email && savedPassword == password {
+            let storyboard = UIStoryboard(name: "Main", bundle: nil)
+            
+            guard let homeVC = storyboard.instantiateViewController(withIdentifier: "HomeViewController") as? HomeViewController else {
+                return
+            }
+            navigationController?.pushViewController(homeVC, animated: true)
+        } else {
+            showAlert(title: "Ошибка",
+                      message: "Неверный логин или пароль")
+        }
     }
-    
     
     @IBAction func registerButtonTapped(_ sender: Any) {
         
+        //Пуш в RegisterViewController
         let storyboard = UIStoryboard(name: "Main", bundle: nil)
         
         guard let registerVC = storyboard.instantiateViewController(withIdentifier: "RegisterViewController") as? RegisterViewController else { return }
@@ -110,5 +148,23 @@ class LoginViewController: UIViewController {
     }
 }
 
-
-
+//MARK: - Расширение для Alert
+extension LoginViewController {
+    
+    func showAlert(title: String, message: String) {
+        
+        let alert = UIAlertController(
+            title: title,
+            message: message,
+            preferredStyle: .alert)
+        
+        let okAction = UIAlertAction(
+            title: "OK",
+            style: .default,
+            handler: nil)
+        
+        alert.addAction(okAction)
+        
+        present(alert, animated: true, completion: nil)
+    }
+}

@@ -7,10 +7,9 @@
 
 import UIKit
 
-class RegisterViewController: UIViewController {
+final class RegisterViewController: UIViewController {
     
-    
-    
+    //MARK: - Аутлеты
     @IBOutlet weak var appNameRegisterLabel: UILabel!
     
     @IBOutlet weak var nameAndEmailLabel: UILabel!
@@ -27,13 +26,16 @@ class RegisterViewController: UIViewController {
     
     private let contentStackRegister = UIStackView()
     
+    //MARK: - viewDidLoad
     override func viewDidLoad() {
         super.viewDidLoad()
         
         setupRegisterUI()
         setupRegisterLayout()
+        setupTextFields()
     }
     
+    //MARK: - Настройка UI и Layout
     private func setupRegisterUI() {
         
         registerButton.layer.cornerRadius = 1
@@ -55,12 +57,14 @@ class RegisterViewController: UIViewController {
         userPasswordTextField.layer.borderWidth = 1
         userPasswordTextField.layer.borderColor = UIColor.systemGray4.cgColor
         userPasswordTextField.clipsToBounds = true
+        userPasswordTextField.isSecureTextEntry = true
         
         userRepeatPasswordTextField.borderStyle = .none
         userRepeatPasswordTextField.layer.cornerRadius = 5
         userRepeatPasswordTextField.layer.borderWidth = 1
         userRepeatPasswordTextField.layer.borderColor = UIColor.systemGray4.cgColor
         userRepeatPasswordTextField.clipsToBounds = true
+        userRepeatPasswordTextField.isSecureTextEntry = true
     }
     
     private func setupRegisterLayout() {
@@ -94,20 +98,172 @@ class RegisterViewController: UIViewController {
             contentStackRegister.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 45),
             contentStackRegister.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -45),
             contentStackRegister.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 45),
-
+            
             registerButton.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 100),
             registerButton.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -100),
             registerButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -95),
             
-            userNameTextField.heightAnchor.constraint(equalToConstant: 30),
-            userEmailTextField.heightAnchor.constraint(equalToConstant: 30),
-            userPasswordTextField.heightAnchor.constraint(equalToConstant: 30),
-            userRepeatPasswordTextField.heightAnchor.constraint(equalToConstant: 30)
+            userNameTextField.heightAnchor.constraint(equalToConstant: 35),
+            userEmailTextField.heightAnchor.constraint(equalToConstant: 35),
+            userPasswordTextField.heightAnchor.constraint(equalToConstant: 35),
+            userRepeatPasswordTextField.heightAnchor.constraint(equalToConstant: 35)
         ])
         
         contentStackRegister.setCustomSpacing(20, after: nameAndEmailLabel)
     }
     
+    private func setupTextFields() {
+        
+        userNameTextField.delegate = self
+        userEmailTextField.delegate = self
+        userPasswordTextField.delegate = self
+        userRepeatPasswordTextField.delegate = self
+        
+        //Тип клавиатуры для мейла
+        userEmailTextField.keyboardType = .emailAddress
+        
+        //Автокоррекция
+        userEmailTextField.autocorrectionType = .no
+        
+        userPasswordTextField.autocorrectionType = .no
+        userRepeatPasswordTextField.autocorrectionType = .no
+        
+        //Авто заглавные буквы
+        userEmailTextField.autocapitalizationType = .none
+    }
+    
+    //MARK: - Кнопка регистрации и пуш в HomeViewController
     @IBAction func registerButtonTapped(_ sender: Any) {
+        
+        guard
+            let name = userNameTextField.text,
+            let email = userEmailTextField.text,
+            let password = userPasswordTextField.text,
+            let repeatPassword = userRepeatPasswordTextField.text
+        else {
+            return
+        }
+        
+        //Проверка на заполнение полей
+        if name.isEmpty || email.isEmpty || password.isEmpty || repeatPassword.isEmpty {
+            showAlert(title: "Ошибка",
+                      message: "Заполните все поля")
+            return
+        }
+        
+        //Проверка совпадения паролей
+        if password != repeatPassword {
+            showAlert(title: "Ошибка",
+                      message: "Пароли не совпадают")
+            return
+        }
+        
+        //Валидация мейла
+        if !isValidEmail(email) {
+            showAlert(title: "Ошибка",
+                      message: "Некорректный Email")
+            return
+        }
+        
+        //Длинна пароля
+        if password.count < 6 {
+            showAlert(title: "Ошибка",
+                      message: "Пароль должен быть больше 6 символов")
+            return
+        }
+        
+        //Проверка наличия пользователей с одним email
+        if let existingUser = UserStorage.shared.getUser() {
+            if existingUser.email == email {
+                showAlert(title: "Ошибка",
+                          message: "Такой пользователь уже существует")
+                return
+            }
+        }
+        
+        let user = User(name: name, email: email)
+        
+        UserStorage.shared.saveUser(user)
+        KeychainService.shared.savePassword(password, for: email)
+        
+        //Пуш на HomeViewController
+        let storyboard = UIStoryboard(name: "Main", bundle: nil)
+        
+        guard let homeVC = storyboard.instantiateViewController(withIdentifier: "HomeViewController") as? HomeViewController else {
+            return
+        }
+        
+        navigationController?.pushViewController(homeVC, animated: true)
+    }
+    
+    //MARK: - Валидация
+    private func isValidEmail(_ email: String) -> Bool {
+        let emailRegEx = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
+        
+        let emailPred = NSPredicate(format:"SELF MATCHES %@", emailRegEx)
+        return emailPred.evaluate(with: email)
+    }
+}
+
+//MARK: - Расширение для TextField
+extension RegisterViewController: UITextFieldDelegate {
+    
+    func textField(_textField: UITextField,
+                   shouldCharactersIn range: NSRange,
+                   replacementString string: String) -> Bool {
+        
+        let currentText = _textField.text ?? ""
+        
+        guard let stringRange = Range(range, in: currentText) else {
+            return false
+        }
+        
+        let updatedText = currentText.replacingCharacters(in: stringRange, with: string)
+        
+        //MARK: - Поле "Имя"
+        if _textField == userNameTextField {
+            let allowedCharacters = CharacterSet.letters.union(.whitespacesAndNewlines)
+            let characterSet = CharacterSet(charactersIn: string)
+            return allowedCharacters.isSuperset(of: characterSet) && updatedText.count <= 20
+        }
+        
+        //MARK: - Поле "мейл"
+        if _textField == userEmailTextField {
+            
+            //Без пробелов
+            if updatedText.contains(" ") {
+                return false
+            }
+            
+            //Максимальная длинна
+            return updatedText.count <= 40
+        }
+        
+        //MARK: - Поле "пароль"
+        if _textField == userPasswordTextField || _textField == userRepeatPasswordTextField {
+            return updatedText.count <= 16
+        }
+        return true
+    }
+}
+
+//MARK: - Расширение для Alert
+extension RegisterViewController {
+    
+    func showAlert(title: String, message: String) {
+        
+        let alert = UIAlertController(
+            title: title,
+            message: message,
+            preferredStyle: .alert)
+        
+        let okAction = UIAlertAction(
+            title: "OK",
+            style: .default,
+            handler: nil)
+        
+        alert.addAction(okAction)
+        
+        present(alert, animated: true, completion: nil)
     }
 }
